@@ -1,4 +1,5 @@
-import os
+module main
+
 import readline
 
 enum Proc {
@@ -44,35 +45,31 @@ mut:
   define []Token
 }
 
-fn (t Token) str() string {
-  switch t.typ {
-    case TokenType.boolean:
+pub fn (t Token) str() string {
+  match t.typ {
+    .boolean {
       if t.boolean {
         return '#t'
       } else {
         return '#f'
       }
-    case TokenType.integer:
-      return '$t.integer'
-    case TokenType.float:
-      return '$t.float'
-    case TokenType.str:
-      return '$t.stri'
-    case TokenType.token_list:
-      return '$t.token_list'
-    case TokenType.cons:
-      return '(${show_cons(t)})'
+    }
+    .integer { return '$t.integer' }
+    .float { return '$t.float' }
+    .str { return '$t.stri' }
+    .token_list { return '$t.token_list' }
+    .cons { return '(${show_cons(t)})' }
+    else { return '' }
   }
-  return ''
 }
 
 fn show_cons(t Token) string {
   if t.token_list.len == 1 {
     return '${t.token_list[0]}'
   }
-  if t.token_list[1].typ == TokenType.token_list && t.token_list[1].token_list.len == 0 {
+  if t.token_list[1].typ == .token_list && t.token_list[1].token_list.len == 0 {
     return '${t.token_list[0]}'
-  } else if t.token_list[1].typ == TokenType.cons {
+  } else if t.token_list[1].typ == .cons {
     return '${t.token_list[0]} ${show_cons(t.token_list[1])}'
   } else {
     //Apparently simple interpolation adds a space so i call str method
@@ -84,17 +81,17 @@ fn plus(expr Token) Token {
   mut res := 0.0
   mut float := false
   for tok in expr.token_list {
-    if tok.typ == TokenType.integer {
+    if tok.typ == .integer {
       res += tok.integer
-    } else if tok.typ == TokenType.float {
+    } else if tok.typ == .float {
       res += tok.float
       float = true
     }
   }
   if !float {
-    return Token{typ: TokenType.integer, integer: int(res)}
+    return Token{typ: .integer, integer: int(res)}
   } else {
-    return Token{typ: TokenType.float, float: res}
+    return Token{typ: .float, float: res}
   }
 }
 
@@ -103,33 +100,33 @@ fn min(expr Token) Token {
   mut float := false
 
   if expr.token_list.len == 1 {
-    if expr.token_list[0].typ == TokenType.integer {
+    if expr.token_list[0].typ == .integer {
       res = -expr.token_list[0].integer
-    } else if expr.token_list[0].typ == TokenType.float {
+    } else if expr.token_list[0].typ == .float {
       res = -expr.token_list[0].float
       float = true
     }
   } else {
-    if expr.token_list[0].typ == TokenType.integer {
+    if expr.token_list[0].typ == .integer {
       res = expr.token_list[0].integer
-    } else if expr.token_list[0].typ == TokenType.float {
+    } else if expr.token_list[0].typ == .float {
       res = expr.token_list[0].float
       float = true
     }
-    expr_list := expr.token_list.right(1)
+    expr_list := expr.token_list[1..]
     for tok in expr_list {
-      if tok.typ == TokenType.integer {
+      if tok.typ == .integer {
         res -= tok.integer
-      } else if tok.typ == TokenType.float {
+      } else if tok.typ == .float {
         res -= tok.float
         float = true
       }
     }
   }
   if !float {
-    return Token{typ: TokenType.integer, integer: int(res)}
+    return Token{typ: .integer, integer: int(res)}
   } else {
-    return Token{typ: TokenType.float, float: res}
+    return Token{typ: .float, float: res}
   }
 }
 
@@ -137,17 +134,17 @@ fn mul(expr Token) Token {
   mut res := 1.0
   mut float := false
   for tok in expr.token_list {
-    if tok.typ == TokenType.integer {
+    if tok.typ == .integer {
       res *= tok.integer
-    } else if tok.typ == TokenType.float {
+    } else if tok.typ == .float {
       res *= tok.float
       float = true
     }
   }
   if !float {
-    return Token{typ: TokenType.integer, integer: int(res)}
+    return Token{typ: .integer, integer: int(res)}
   } else {
-    return Token{typ: TokenType.float, float: res}
+    return Token{typ: .float, float: res}
   }
 }
 
@@ -155,41 +152,41 @@ fn divi(expr Token) Token {
   mut res := 0.0
 
   if expr.token_list.len == 1 {
-    if expr.token_list[0].typ == TokenType.integer {
+    if expr.token_list[0].typ == .integer {
       res = f32(1) / expr.token_list[0].integer
-    } else if expr.token_list[0].typ == TokenType.float {
+    } else if expr.token_list[0].typ == .float {
       res = f32(1) / expr.token_list[0].float
     }
   } else {
-    if expr.token_list[0].typ == TokenType.integer {
+    if expr.token_list[0].typ == .integer {
       res = expr.token_list[0].integer
-    } else if expr.token_list[0].typ == TokenType.float {
+    } else if expr.token_list[0].typ == .float {
       res = expr.token_list[0].float
     }
-    expr_list := expr.token_list.right(1)
+    expr_list := expr.token_list[1..]
     for tok in expr_list {
-      if tok.typ == TokenType.integer {
+      if tok.typ == .integer {
         res /= tok.integer
-      } else if tok.typ == TokenType.float {
+      } else if tok.typ == .float {
         res /= tok.float
       }
     }
   }
-  return Token{typ: TokenType.float, float: res}
+  return Token{typ: .float, float: res}
 }
 
 fn mod(expr Token) Token {
-  a := if expr.token_list[0].typ == TokenType.integer {
+  a := if expr.token_list[0].typ == .integer {
     expr.token_list[0].integer
   } else {
     int(expr.token_list[0].float) //Cant mod floats in v :(
   }
-  b := if expr.token_list[1].typ == TokenType.integer {
+  b := if expr.token_list[1].typ == .integer {
     expr.token_list[1].integer
   } else {
     int(expr.token_list[1].float) //Cant mod floats in v :(
   }
-  return Token{typ: TokenType.integer, integer: a % b}
+  return Token{typ: .integer, integer: a % b}
 }
 
 fn lt(expr Token) Token {
@@ -198,23 +195,23 @@ fn lt(expr Token) Token {
   if typ != expr.token_list[1].typ {
     panic('Not the same typ on lt')
   }
-  if typ == TokenType.boolean {
+  if typ == .boolean {
     res = expr.token_list[0].boolean < expr.token_list[1].boolean
   }
-  if typ == TokenType.integer {
+  if typ == .integer {
     res = expr.token_list[0].integer < expr.token_list[1].integer
   }
-  if typ == TokenType.float {
+  if typ == .float {
     res = expr.token_list[0].float < expr.token_list[1].float
   }
-  if typ == TokenType.str {
+  if typ == .str {
     res = expr.token_list[0].stri < expr.token_list[1].stri
   }
-  return Token{typ: TokenType.boolean, boolean: res}
+  return Token{typ: .boolean, boolean: res}
 }
 
 fn cons(expr Token) Token {
-  return Token{typ: TokenType.cons, token_list: [expr.token_list[0], expr.token_list[1]]}
+  return Token{typ: .cons, token_list: [expr.token_list[0], expr.token_list[1]]}
 }
 
 fn car(expr Token) Token {
@@ -223,15 +220,15 @@ fn car(expr Token) Token {
 
 fn cdr(expr Token) Token {
   to_take := expr.token_list[0]
-  if to_take.typ == TokenType.cons {
+  if to_take.typ == .cons {
     return to_take.token_list[1]
   } else {
-    return Token{typ: to_take.typ, token_list: to_take.token_list.right(1)}
+    return Token{typ: to_take.typ, token_list: to_take.token_list[1..]}
   }
 }
 
 fn list(expr Token) Token {
-  return Token{typ: TokenType.token_list, token_list: expr.token_list}
+  return Token{typ: .token_list, token_list: expr.token_list}
 }
 
 fn eq(expr Token) Token {
@@ -240,46 +237,47 @@ fn eq(expr Token) Token {
   if typ != expr.token_list[1].typ {
     panic('Not the same typ on eq')
   }
-  if typ == TokenType.boolean {
+  if typ == .boolean {
     res = expr.token_list[0].boolean == expr.token_list[1].boolean
   }
-  if typ == TokenType.integer {
+  if typ == .integer {
     res = expr.token_list[0].integer == expr.token_list[1].integer
   }
-  if typ == TokenType.float {
+  if typ == .float {
     res = expr.token_list[0].float == expr.token_list[1].float
   }
-  if typ == TokenType.str {
+  if typ == .str {
     res = expr.token_list[0].stri == expr.token_list[1].stri
   }
-  return Token{typ: TokenType.boolean, boolean: res}
+  return Token{typ: .boolean, boolean: res}
 }
 
 fn atom(expr Token) Token {
-  res := expr.token_list[0].typ != TokenType.token_list && expr.token_list[0].typ != TokenType.cons
-  return Token{typ: TokenType.boolean, boolean: res}
+  res := expr.token_list[0].typ != .token_list && expr.token_list[0].typ != .cons
+  return Token{typ: .boolean, boolean: res}
 }
 
 fn call_func(call Token, expr Token) Token {
   match call.function {
-    Proc.plus => { return plus(expr) }
-    Proc.min => { return min(expr) }
-    Proc.mul => { return mul(expr) }
-    Proc.div => { return divi(expr) }
-    Proc.mod => { return mod(expr) }
-    Proc.lt => { return lt(expr) }
-    Proc.cons => { return cons(expr) }
-    Proc.car => { return car(expr) }
-    Proc.cdr => { return cdr(expr) }
-    Proc.list => { return list(expr) }
-    Proc.eq => { return eq(expr) }
-    Proc.atom => { return atom(expr) }
+    .plus { return plus(expr) }
+    .min { return min(expr) }
+    .mul { return mul(expr) }
+    .div { return divi(expr) }
+    .mod { return mod(expr) }
+    .lt { return lt(expr) }
+    .cons { return cons(expr) }
+    .car { return car(expr) }
+    .cdr { return cdr(expr) }
+    .list { return list(expr) }
+    .eq { return eq(expr) }
+    .atom { return atom(expr) }
+    else { Token{typ: .nothing }}
   }
-  return Token{typ: TokenType.str, stri: 'nothing'}
+  return Token{typ: .str, stri: 'nothing'}
 }
 
-fn execute_list(expr Token, env mut Env) Token? {
-  if expr.typ == TokenType.str {
+fn execute_list(expr Token, env mut Env) ?Token {
+  if expr.typ == .str {
     if expr.stri in env.define_nbr {
       nbr := env.define_nbr[expr.stri]
       return env.define[nbr]
@@ -287,7 +285,7 @@ fn execute_list(expr Token, env mut Env) Token? {
     else {
       return error('unknown $expr.stri')
     }
-  } else if expr.typ == TokenType.integer || expr.typ == TokenType.float || expr.typ == TokenType.boolean {
+  } else if expr.typ == .integer || expr.typ == .float || expr.typ == .boolean {
     return expr
   } else if expr.token_list.len >= 2 && expr.token_list[0].stri == 'quote' {
     return expr.token_list[1]
@@ -312,13 +310,13 @@ fn execute_list(expr Token, env mut Env) Token? {
   // } else if expr.token_list.len >= 3 && expr.token_list[0].stri == 'lambda' {
   } else {
     if expr.token_list.len == 0 {
-      return Token{typ: TokenType.token_list, token_list: []Token}
+      return Token{typ: .token_list, token_list: []}
     }
     call := execute_list(expr.token_list[0], mut env) or {
       return error(err)
     }
-    typ := if call.function == Proc.cons { TokenType.cons } else { TokenType.token_list }
-    mut new_expr := Token{typ: typ, token_list: []Token}
+    typ := if call.function == .cons { TokenType.cons } else { TokenType.token_list }
+    mut new_expr := Token{typ: typ, token_list: []}
     for i := 1; i < expr.token_list.len; i++ {
       new_tok := execute_list(expr.token_list[i],mut env) or {
         return error(err)
@@ -327,23 +325,23 @@ fn execute_list(expr Token, env mut Env) Token? {
     }
     return call_func(call, new_expr)
   }
-  return Token{typ: TokenType.nothing}
+  return Token{typ: .nothing}
 }
 
-fn parse_expr(expr mut []string) Token? {
+fn parse_expr(expr mut []string) ?Token {
   if expr.len <= 1 {
     return error('unexpected eof')
   }
   tok := expr[0]
   expr.delete(0)
   if tok == '#t' {
-    return Token{typ: TokenType.boolean, boolean: true}
+    return Token{typ: .boolean, boolean: true}
   }
   if tok == '#f' {
-    return Token{typ: TokenType.boolean, boolean: false}
+    return Token{typ: .boolean, boolean: false}
   }
   if tok == '\'' {
-    mut new_list := Token{typ: TokenType.token_list, token_list: [Token{typ: TokenType.str, stri: 'quote'}]}
+    mut new_list := Token{typ: .token_list, token_list: [Token{typ: .str, stri: 'quote'}]}
     new_expr := parse_expr(mut expr) or {
       return error(err)
     }
@@ -351,7 +349,7 @@ fn parse_expr(expr mut []string) Token? {
     return new_list
   }
   if tok == '(' {
-    mut new_list := Token{typ: TokenType.token_list, token_list: []Token}
+    mut new_list := Token{typ: .token_list, token_list: []}
     for expr[0] != ')' {
       new_expr := parse_expr(mut expr) or {
         return error(err)
@@ -369,12 +367,12 @@ fn parse_expr(expr mut []string) Token? {
   }
   if tok[0].is_digit() {
     if tok.contains('.') {
-      return Token{typ: TokenType.float, float: tok.f32()}
+      return Token{typ: .float, float: tok.f32()}
     } else {
-      return Token{typ: TokenType.integer, integer: tok.int()}
+      return Token{typ: .integer, integer: tok.int()}
     }
   }
-  return Token{typ: TokenType.str, stri: tok}
+  return Token{typ: .str, stri: tok}
 }
 
 fn execute_lisp(line string, env mut Env) {
@@ -412,18 +410,18 @@ fn init_env() Env {
       'atom?': int(Proc.atom)
     }
     define: [
-      Token{ typ: TokenType.function, function: Proc.plus},
-      Token{ typ: TokenType.function, function: Proc.min},
-      Token{ typ: TokenType.function, function: Proc.mul},
-      Token{ typ: TokenType.function, function: Proc.div},
-      Token{ typ: TokenType.function, function: Proc.mod},
-      Token{ typ: TokenType.function, function: Proc.lt},
-      Token{ typ: TokenType.function, function: Proc.cons},
-      Token{ typ: TokenType.function, function: Proc.car},
-      Token{ typ: TokenType.function, function: Proc.cdr},
-      Token{ typ: TokenType.function, function: Proc.list},
-      Token{ typ: TokenType.function, function: Proc.eq},
-      Token{ typ: TokenType.function, function: Proc.atom}
+      Token{ typ: .function, function: .plus},
+      Token{ typ: .function, function: .min},
+      Token{ typ: .function, function: .mul},
+      Token{ typ: .function, function: .div},
+      Token{ typ: .function, function: .mod},
+      Token{ typ: .function, function: .lt},
+      Token{ typ: .function, function: .cons},
+      Token{ typ: .function, function: .car},
+      Token{ typ: .function, function: .cdr},
+      Token{ typ: .function, function: .list},
+      Token{ typ: .function, function: .eq},
+      Token{ typ: .function, function: .atom}
     ]
   }
 }
@@ -431,11 +429,10 @@ fn init_env() Env {
 fn main() {
   env := init_env()
   mut rl := readline.Readline{}
-  rl.enable_raw_mode2()
-  mut line := rl.read_line('')
-  for line != '' {
+  mut line := rl.read_line('') or { exit }
+  for line.len > 0 && line != '' {
     execute_lisp(line.trim_space(), mut env)
-    line = rl.read_line('')
+    line = ''
+    line = rl.read_line('') or { exit }
   }
-  rl.disable_raw_mode()
 }
