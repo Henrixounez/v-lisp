@@ -33,7 +33,7 @@ mut:
   typ TokenType
   boolean bool
   integer int
-  float f32
+  float f64
   stri string
   function Proc
   token_list []Token
@@ -101,9 +101,9 @@ fn min(expr Token) Token {
 
   if expr.token_list.len == 1 {
     if expr.token_list[0].typ == .integer {
-      res = -expr.token_list[0].integer
+      res = -(expr.token_list[0].integer)
     } else if expr.token_list[0].typ == .float {
-      res = -expr.token_list[0].float
+      res = -(expr.token_list[0].float)
       float = true
     }
   } else {
@@ -196,7 +196,7 @@ fn lt(expr Token) Token {
     panic('Not the same typ on lt')
   }
   if typ == .boolean {
-    res = expr.token_list[0].boolean < expr.token_list[1].boolean
+    res = !expr.token_list[0].boolean && expr.token_list[1].boolean
   }
   if typ == .integer {
     res = expr.token_list[0].integer < expr.token_list[1].integer
@@ -271,12 +271,12 @@ fn call_func(call Token, expr Token) Token {
     .list { return list(expr) }
     .eq { return eq(expr) }
     .atom { return atom(expr) }
-    else { Token{typ: .nothing }}
+    // else { Token{typ: .nothing }}
   }
   return Token{typ: .str, stri: 'nothing'}
 }
 
-fn execute_list(expr Token, env mut Env) ?Token {
+fn execute_list(expr Token, mut env Env) ?Token {
   if expr.typ == .str {
     if expr.stri in env.define_nbr {
       nbr := env.define_nbr[expr.stri]
@@ -328,7 +328,7 @@ fn execute_list(expr Token, env mut Env) ?Token {
   return Token{typ: .nothing}
 }
 
-fn parse_expr(expr mut []string) ?Token {
+fn parse_expr(mut expr []string) ?Token {
   if expr.len <= 1 {
     return error('unexpected eof')
   }
@@ -375,7 +375,7 @@ fn parse_expr(expr mut []string) ?Token {
   return Token{typ: .str, stri: tok}
 }
 
-fn execute_lisp(line string, env mut Env) {
+fn execute_lisp(line string, mut env Env) {
   mut expr := line.replace('(', '( ').replace(')', ' )').replace('\'', ' \' ').split(' ')
   expr << ' '
   for expr[0] != ' ' {
@@ -427,12 +427,12 @@ fn init_env() Env {
 }
 
 fn main() {
-  env := init_env()
+  mut env := init_env()
   mut rl := readline.Readline{}
-  mut line := rl.read_line('') or { exit }
+  mut line := rl.read_line('') or { exit(1) }
   for line.len > 0 && line != '' {
     execute_lisp(line.trim_space(), mut env)
     line = ''
-    line = rl.read_line('') or { exit }
+    line = rl.read_line('') or { exit(1) }
   }
 }
