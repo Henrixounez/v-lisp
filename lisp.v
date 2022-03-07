@@ -26,6 +26,7 @@ enum TokenType {
   token_list
   cons
   function
+  lambda
 }
 
 struct Token {
@@ -37,12 +38,26 @@ mut:
   stri string
   function Proc
   token_list []Token
+  env &Env = 0
 }
 
+[heap]
 struct Env {
 mut:
   define_nbr map[string]int
   define []Token
+  link &Env = 0
+}
+
+fn (mut self Env) find(str string) Token{
+  if str in self.define_nbr {
+    nbr := self.define_nbr[str]
+    return self.define[nbr]
+  } else if self.link != 0 {
+    return self.link.find(str)
+  }
+  println('??? not found ${str}')
+  return Token{typ: .str, stri: str} 
 }
 
 pub fn (t Token) str() string {
@@ -249,6 +264,9 @@ fn eq(expr Token) Token {
   if typ == .str {
     res = expr.token_list[0].stri == expr.token_list[1].stri
   }
+  else if typ == .token_list {
+    res = expr.token_list[0].token_list == expr.token_list[1].token_list
+  }
   return Token{typ: .boolean, boolean: res}
 }
 
@@ -278,51 +296,63 @@ fn call_func(call Token, expr Token) Token {
 
 fn execute_list(expr Token, mut env Env) ?Token {
   if expr.typ == .str {
-    if expr.stri in env.define_nbr {
-      nbr := env.define_nbr[expr.stri]
-      return env.define[nbr]
-    }
-    else {
-      return error('unknown $expr.stri')
-    }
+    //if expr.stri in env.define_nbr {
+    //  nbr := env.define_nbr[expr.stri]
+    //  return env.define[nbr]
+    //}
+    //else {
+    //  return error('unknown $expr.stri')
+    //}
+    return env.find(expr.stri)
   } else if expr.typ == .integer || expr.typ == .float || expr.typ == .boolean {
     return expr
   } else if expr.token_list.len >= 2 && expr.token_list[0].stri == 'quote' {
     return expr.token_list[1]
   } else if expr.token_list.len >= 3 && expr.token_list[0].stri == 'define' {
-    new_tok := execute_list(expr.token_list[2], mut env) or {
-      return error(err)
-    }
     env.define_nbr[expr.token_list[1].stri] = env.define.len
-    env.define << new_tok
+    env.define << execute_list(expr.token_list[2], mut env) or { return err } 
+    return Token{typ: .str, stri: expr.token_list[1].stri}    
   } else if expr.token_list.len >= 2 && expr.token_list[0].stri == 'cond' {
     for i := 1; i < expr.token_list.len; i++ {
       if expr.token_list[i].token_list.len < 2 {
         return error('cond list too small')
       }
       res := execute_list(expr.token_list[i].token_list[0], mut env) or {
-        return error(err)
+        return err
       }
       if res.boolean {
         return execute_list(expr.token_list[i].token_list[1], mut env)
       }
     }
-  // } else if expr.token_list.len >= 3 && expr.token_list[0].stri == 'lambda' {
+  } else if expr.token_list.len == 3 && expr.token_list[0].stri == 'lambda' {
+      mut new_expr := expr
+      new_expr.typ = .lambda
+      new_expr.env = &env  
+      return new_expr
+  }
+  if expr.token_list.len == 0 {
+    return Token{typ: .token_list, token_list: []}
+  }
+  call := execute_list(expr.token_list[0], mut env) or {
+    return err
+  }
+  typ := if call.function == .cons { TokenType.cons } else { TokenType.token_list }
+  mut new_expr := Token{typ: typ, token_list: []}
+  for i := 1; i < expr.token_list.len; i++ {
+    new_tok := execute_list(expr.token_list[i],mut env) or {
+      return err
+    }
+    new_expr.token_list << new_tok
+  }
+  if call.typ == .lambda {
+    mut new_env := Env{}
+    for i := 0; i < call.token_list[1].token_list.len; i++ {      
+      new_env.define_nbr[call.token_list[1].token_list[i].stri] = new_env.define.len
+      new_env.define << new_expr.token_list[i] 
+    }
+    new_env.link = call.env
+    return execute_list(call.token_list[2], mut new_env)
   } else {
-    if expr.token_list.len == 0 {
-      return Token{typ: .token_list, token_list: []}
-    }
-    call := execute_list(expr.token_list[0], mut env) or {
-      return error(err)
-    }
-    typ := if call.function == .cons { TokenType.cons } else { TokenType.token_list }
-    mut new_expr := Token{typ: typ, token_list: []}
-    for i := 1; i < expr.token_list.len; i++ {
-      new_tok := execute_list(expr.token_list[i],mut env) or {
-        return error(err)
-      }
-      new_expr.token_list << new_tok
-    }
     return call_func(call, new_expr)
   }
   return Token{typ: .nothing}
@@ -343,7 +373,7 @@ fn parse_expr(mut expr []string) ?Token {
   if tok == '\'' {
     mut new_list := Token{typ: .token_list, token_list: [Token{typ: .str, stri: 'quote'}]}
     new_expr := parse_expr(mut expr) or {
-      return error(err)
+      return err
     }
     new_list.token_list << new_expr
     return new_list
@@ -352,7 +382,7 @@ fn parse_expr(mut expr []string) ?Token {
     mut new_list := Token{typ: .token_list, token_list: []}
     for expr[0] != ')' {
       new_expr := parse_expr(mut expr) or {
-        return error(err)
+        return err
       }
       new_list.token_list << new_expr
       if expr.len == 1 {
@@ -375,8 +405,31 @@ fn parse_expr(mut expr []string) ?Token {
   return Token{typ: .str, stri: tok}
 }
 
+fn token(line string) [] string {
+  mut list := []string{}
+  mut str := ''  
+
+  for c in line {  
+    mut ch := c.ascii_str()
+    match ch {
+      '(',')','\'',' ' { 
+              if str.len>0 {        
+                list << str
+                str = ''        
+              }
+              if ch != ' ' { list << ch }
+           }
+      else { str += ch }
+    }
+  }
+  if str != '' && str != '\n'{
+    list << str.replace('\n','') //???
+  }
+  return list
+} 
+
 fn execute_lisp(line string, mut env Env) {
-  mut expr := line.replace('(', '( ').replace(')', ' )').replace('\'', ' \' ').split(' ')
+  mut expr := token(line)
   expr << ' '
   for expr[0] != ' ' {
     expr_list := parse_expr(mut expr) or {
@@ -423,16 +476,17 @@ fn init_env() Env {
       Token{ typ: .function, function: .eq},
       Token{ typ: .function, function: .atom}
     ]
+    link : 0
   }
 }
 
 fn main() {
   mut env := init_env()
   mut rl := readline.Readline{}
-  mut line := rl.read_line('') or { exit(1) }
+  mut line := rl.read_line('vlisp> ') or { exit(1) }
   for line.len > 0 && line != '' {
     execute_lisp(line.trim_space(), mut env)
     line = ''
-    line = rl.read_line('') or { exit(1) }
+    line = rl.read_line('vlisp> ') or { exit(1) }
   }
 }
